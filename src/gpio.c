@@ -177,3 +177,32 @@ bool gpio_read(EE14Lib_Pin pin)
     return (port->IDR >> pin_offset) & 1UL;
 }
 
+// void config_gpio_interrupt(void) {
+//     // 0
+//     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
+//     SYSCFG->EXTICR[1] &= ~SYSCFG_EXTICR1_EXTI0_Msk;
+//     SYSCFG->EXTICR[1] |= SYSCFG_EXTICR1_EXTI0_PB;
+    
+//     EXTI->FTSR1 |= EXTI_FTSR1_FT0_Msk;
+//     EXTI->IMR1 |= EXTI_IMR1_IM0_Msk;
+//     NVIC_SetPriority(EXTI0_IRQn, 2); // (IRQ number, priority)
+//     NVIC_EnableIRQ(EXTI0_IRQn);
+// }
+
+EE14Lib_Err gpio_config_direction(EE14Lib_Pin pin, unsigned int direction)
+{
+    GPIO_TypeDef* port = g_GPIO_port[pin];
+    uint8_t pin_offset = g_GPIO_pin[pin];
+
+    if(direction & ~0b1UL){ // Only 0b00 and 0b01 are valid directions
+        return EE14Lib_ERR_INVALID_CONFIG;
+    }
+
+    // Enable the GPIO port in case it hasn't been already
+    gpio_enable_port(port);
+
+    port->MODER &= ~(0b11 << pin_offset*2); // Clear both mode bits
+    port->MODER |=  (direction << pin_offset*2);
+
+    return EE14Lib_Err_OK;
+}
