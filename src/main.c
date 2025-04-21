@@ -23,11 +23,11 @@
 #define OSCA 0
 #define OSCB 1
 
-#define SINE_WAVE 2
-#define SQUARE_WAVE 3
-#define TRIANGLE_WAVE 4
-#define SAWTOOTH_WAVE 5
-#define OSCILLATOR_OFF 6
+#define SINE_WAVE 0
+#define SQUARE_WAVE 1
+#define TRIANGLE_WAVE 2
+#define SAWTOOTH_WAVE 3
+#define OSCILLATOR_OFF 4
 
 #define BLINK_INTERVAL_MS 500
 
@@ -289,11 +289,12 @@ int main(void) {
     LEDOutput(OSC, CURRENT_WAVEFORM); // Set LED color
 
     while (1) {
-        DAC_setValue(waveTable[index]);
-        index++;
-        if (index >= WAVE_TABLE_SIZE) {
-            index = 0;  // Reset index to loop through the wave table
-        }
+        // DAC_setValue(waveTable[index]);
+        // index++;
+        // if (index >= WAVE_TABLE_SIZE) {
+        //     index = 0;  // Reset index to loop through the wave table
+        // }
+        DAC_setValue(waveTable[CURRENT_WAVEFORM]);
         delay10us((int)delay_us_value / 10);  // Use the calculated delay
     }
 }
