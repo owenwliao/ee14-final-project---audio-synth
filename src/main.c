@@ -52,7 +52,7 @@ int BLUE; // triangle
 int YELLOW; // saw
 int WHITE;
 int OSC = 1; // 0 for A, 1 for B
-int CURRENT_WAVEFORM = 2;
+int CURRENT_WAVEFORM = 0;
 
 void set_color(uint16_t red, uint16_t green, uint16_t blue) {
     timer_config_channel_pwm(TIMER, RED_PIN, red);
