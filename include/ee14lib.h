@@ -45,6 +45,7 @@ EE14Lib_Err gpio_config_pullup(EE14Lib_Pin pin, unsigned int mode);
 EE14Lib_Err gpio_config_otype(EE14Lib_Pin pin, unsigned int otype);
 EE14Lib_Err gpio_config_ospeed(EE14Lib_Pin pin, unsigned int ospeed);
 EE14Lib_Err gpio_config_alternate_function(EE14Lib_Pin pin, unsigned int function);
+EE14Lib_Err gpio_config_direction(EE14Lib_Pin pin, unsigned int direction);
 void gpio_write(EE14Lib_Pin pin, bool value);
 bool gpio_read(EE14Lib_Pin pin);
 

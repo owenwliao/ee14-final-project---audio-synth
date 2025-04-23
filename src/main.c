@@ -278,10 +278,17 @@ int main(void) {
     // initializing DAC using dacOutput
     DAC_init();
     int index = 0;
-    float waveTable[WAVE_TABLE_SIZE];
-    buildWaveTable(waveTable);  // Build the wave table
+    float sineTable[WAVE_TABLE_SIZE];
+    float squareTable[WAVE_TABLE_SIZE];
+    float triangleTable[WAVE_TABLE_SIZE];
+    float sawtoothTable[WAVE_TABLE_SIZE];
+
+    buildWaveTable(sineTable);
+    buildSquareWaveTable(squareTable);
+    buildTriangleWaveTable(triangleTable);
+    buildSawtoothWaveTable(sawtoothTable);
     
-    float frequency = A4; // Set desired frequency (e.g., A4 = 440 Hz)
+    float frequency = A4; // Set desired frequency
     float delay_us_value = (1.0 / frequency) / WAVE_TABLE_SIZE * 1e6; // Delay in microseconds
     int delay10us_value = (int)(delay_us_value / 10.0 + 0.5); // Convert to multiples of 10 us (round to nearest)
 
@@ -289,12 +296,26 @@ int main(void) {
     LEDOutput(OSC, CURRENT_WAVEFORM); // Set LED color
 
     while (1) {
-        // DAC_setValue(waveTable[index]);
-        // index++;
-        // if (index >= WAVE_TABLE_SIZE) {
-        //     index = 0;  // Reset index to loop through the wave table
-        // }
-        DAC_setValue(waveTable[CURRENT_WAVEFORM]);
+        if (CURRENT_WAVEFORM == SINE_WAVE) {
+            DAC_setValue(sineTable[index]);
+        }
+        else if (CURRENT_WAVEFORM == SQUARE_WAVE) {
+            DAC_setValue(squareTable[index]);
+        }
+        else if (CURRENT_WAVEFORM == TRIANGLE_WAVE) {
+            DAC_setValue(triangleTable[index]);
+        }
+        else if (CURRENT_WAVEFORM == SAWTOOTH_WAVE) {
+            DAC_setValue(sawtoothTable[index]);
+        }
+        else { // oscillator off
+            DAC_setValue(0);
+        }
+        
+        index++;
+        if (index >= WAVE_TABLE_SIZE) {
+            index = 0;  // Reset index to loop through the wave table
+        }
         delay10us((int)delay_us_value / 10);  // Use the calculated delay
     }
 }
