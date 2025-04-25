@@ -18,21 +18,18 @@ void DAC_init(void) {
     DAC->MCR &= ~DAC_MCR_MODE1;             // Clear mode bits
     DAC->MCR |= (0b010 << DAC_MCR_MODE1_Pos);
 
-    // // triangle waveform
-    // DAC->CR &= ~DAC_CR_WAVE1;           // reset
-    // DAC->CR |= 2U << DAC_CR_WAVE1_Pos;  // set to 0b10
-
-    // DAC->CR &= ~DAC_CR_MAMP1;           // reset
-    // DAC->CR |= 0b1111 << DAC_CR_MAMP1_Pos;  // max amplitude
-
-    // // DAC->CR &= ~DAC_CR_TEN1;
-    // DAC->CR |= DAC_CR_TEN1;
+    DAC->CR &= ~(0b111 << 3); // set trigger to TIM6
 
     DAC->CR |= DAC_CR_EN1;               // enable DAC
+    //select trigger source
 }
 
 // write a 12-bit value to the dac channel 1
 void DAC_setValue(uint16_t value) {
-    value = value & 0x0FFF;
+    // value = value & 0x0FFF;
+    // while (DAC->SR & DAC_SR_BWST1); // wait for the buffer to be empty
+
     DAC->DHR12R1 = value;
+
+    // DAC->SWTRIGR |= DAC_SWTRIGR_SWTRIG1; // trigger the conversion
 }

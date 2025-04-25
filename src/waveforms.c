@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <math.h>
 
-#define WAVE_TABLE_SIZE 1024
+#define WAVE_TABLE_SIZE 91
 #define PI 3.14159265358979323846
 
 // arrays for waveforms

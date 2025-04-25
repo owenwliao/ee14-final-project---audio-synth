@@ -29,6 +29,11 @@
 #define SAWTOOTH_WAVE 3
 #define OSCILLATOR_OFF 4
 
+float sineTable[WAVE_TABLE_SIZE];
+float squareTable[WAVE_TABLE_SIZE];
+float triangleTable[WAVE_TABLE_SIZE];
+float sawtoothTable[WAVE_TABLE_SIZE];
+
 #define BLINK_INTERVAL_MS 500
 
 // red = sine
@@ -53,6 +58,7 @@ int YELLOW; // saw
 int WHITE;
 int OSC = 1; // 0 for A, 1 for B
 int CURRENT_WAVEFORM = 0;
+float *currentTablePointer = sineTable; // Pointer to the current waveform table
 
 void set_color(uint16_t red, uint16_t green, uint16_t blue) {
     timer_config_channel_pwm(TIMER, RED_PIN, red);
@@ -105,11 +111,13 @@ void LEDOutput(int oscillator, int waveform) {
     set_color(RED, GREEN, BLUE); 
 }
 
-volatile int tick = 0;
+volatile unsigned int tick = 0;
 volatile int ledState = 0;
+
 void SysTick_Handler(void) {
-    // static int blinkCounter = 0;
+    // DAC_setValue(currentTablePointer[tick]); 
     tick++;
+    // tick %= WAVE_TABLE_SIZE; // Wrap around the tick value
 }
 
 // retargeting USART2 -> printf
@@ -123,8 +131,8 @@ void SysTick_initialize(void) {
     SysTick->CTRL = 0;
 
     // Set how often the interrupt should fire
-    // We want a 1 kHz interrupt frequency and the clock is running at 4 MHz
-    SysTick->LOAD = 39; // Set to for 1 us interval
+    // Clock runs at 4MHz
+    SysTick->LOAD = 39;  
 
     // This sets the priority of the interrupt to 15 (2^4 - 1), which is the
     // largest supported value (aka lowest priority)
@@ -142,12 +150,29 @@ static void delay_us(int us) {
     }
 }
 
-static void delay10us(int delay10us) {
-    int start = tick;
-    while ((tick - start) < (delay10us * 10)) {
-        // wait
-    }
+void TIM6_initialize(void) {
+    // 1. Enable clock
+    RCC->APB1ENR1 |= RCC_APB1ENR1_TIM6EN;
+    __DSB();  // Ensure clock is enabled
+    
+    // 2. Reset timer
+    TIM6->CR1 = 0;
+    TIM6->ARR = 39;
+    
+    // 3. Clear any pending interrupts
+    TIM6->SR = 0;
+    
+    // 4. Enable interrupt
+    TIM6->DIER |= TIM_DIER_UIE;
+    
+    // 5. Configure NVIC
+    NVIC_SetPriority(TIM6_DAC_IRQn, 1);
+    NVIC_EnableIRQ(TIM6_DAC_IRQn);
+    
+    // 6. Start timer
+    TIM6->CR1 |= TIM_CR1_CEN;
 }
+
 
 void TIM7_initialize(void) {
     // 1. Enable clock
@@ -213,10 +238,28 @@ void EXTI1_IRQHandler(void) {
         }
         LEDOutput(OSC, CURRENT_WAVEFORM); // Set LED color
         printf("Current waveform: %d\r\n", CURRENT_WAVEFORM);
+        if (CURRENT_WAVEFORM == SINE_WAVE) {
+            currentTablePointer = sineTable;
+        } else if (CURRENT_WAVEFORM == SQUARE_WAVE) {
+            currentTablePointer = squareTable;
+        } else if (CURRENT_WAVEFORM == TRIANGLE_WAVE) {
+            currentTablePointer = triangleTable;
+        } else if (CURRENT_WAVEFORM == SAWTOOTH_WAVE) {
+            currentTablePointer = sawtoothTable;
+        } else {
+            currentTablePointer = NULL; // No waveform
+        }
 
         EXTI->PR1 |= EXTI_PR1_PIF1; // Clear interrupt flag
 
     }
+}
+
+void TIM6_IRQHandler(void) {
+    DAC_setValue(currentTablePointer[tick]); // Set DAC value from the current waveform table
+    tick++;
+    tick %= WAVE_TABLE_SIZE; 
+    TIM6->SR &= ~TIM_SR_UIF; // Clear the interrupt flag
 }
 
 void config_gpio_interrupt(void)
@@ -244,9 +287,6 @@ void config_gpio_interrupt(void)
 }
 
 int main(void) {
-    // initializing SysTick
-    SysTick_initialize();
-
     // initializing UART
     host_serial_init();
 
@@ -278,10 +318,6 @@ int main(void) {
     // initializing DAC using dacOutput
     DAC_init();
     int index = 0;
-    float sineTable[WAVE_TABLE_SIZE];
-    float squareTable[WAVE_TABLE_SIZE];
-    float triangleTable[WAVE_TABLE_SIZE];
-    float sawtoothTable[WAVE_TABLE_SIZE];
 
     buildWaveTable(sineTable);
     buildSquareWaveTable(squareTable);
@@ -295,27 +331,44 @@ int main(void) {
     printf("Frequency: %f Hz, Delay (us): %f, Delay10us: %d\r\n", frequency, delay_us_value, delay10us_value);
     LEDOutput(OSC, CURRENT_WAVEFORM); // Set LED color
 
+
+    // Initialize TIM6
+    // TIM6_initialize();
+    
+    // initializing SysTick
+    SysTick_initialize();
+
     while (1) {
-        if (CURRENT_WAVEFORM == SINE_WAVE) {
-            DAC_setValue(sineTable[index]);
-        }
-        else if (CURRENT_WAVEFORM == SQUARE_WAVE) {
-            DAC_setValue(squareTable[index]);
-        }
-        else if (CURRENT_WAVEFORM == TRIANGLE_WAVE) {
-            DAC_setValue(triangleTable[index]);
-        }
-        else if (CURRENT_WAVEFORM == SAWTOOTH_WAVE) {
-            DAC_setValue(sawtoothTable[index]);
-        }
-        else { // oscillator off
-            DAC_setValue(0);
-        }
+        // if (CURRENT_WAVEFORM == SINE_WAVE) {
+        //     DAC_setValue(sineTable[index]);
+        // }
+        // else if (CURRENT_WAVEFORM == SQUARE_WAVE) {
+        //     DAC_setValue(squareTable[index]);
+        // }
+        // else if (CURRENT_WAVEFORM == TRIANGLE_WAVE) {
+        //     DAC_setValue(triangleTable[index]);
+        // }
+        // else if (CURRENT_WAVEFORM == SAWTOOTH_WAVE) {
+        //     DAC_setValue(sawtoothTable[index]);
+        // }
+        // else { // oscillator off
+        //     DAC_setValue(0);
+        // }
         
-        index++;
-        if (index >= WAVE_TABLE_SIZE) {
-            index = 0;  // Reset index to loop through the wave table
-        }
-        delay10us((int)delay_us_value / 10);  // Use the calculated delay
+        // index++;
+        // if (index >= WAVE_TABLE_SIZE) {
+        //     index = 0;  // Reset index to loop through the wave table
+        // }
+
+        // DAC_setValue(0);
+        // delay10us(2);  // Use the calculated delay
+        // DAC_setValue(1023);
+        // delay10us(2);  // Use the calculated delay
+            
+        // delay10us((int)delay_us_value / 10);  // Use the calculated delay
+        DAC_setValue(0);
+        delay_us(100);
+        DAC_setValue(4095);
+        delay_us(100);
     }
 }
