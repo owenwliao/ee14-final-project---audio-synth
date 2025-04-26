@@ -7,32 +7,13 @@
 
 #define PI 3.14159265358979323846
 
-#define C4 261.6256
-#define Db4 277.1826
-#define D4 293.6648
-#define Eb4 311.1270
-#define E4 329.6276
-#define F4 349.2282
-#define Gb4 369.9944
-#define G4 391.9954 
-#define Ab4 415.3047 
-#define A4 440.0000
-#define Bb4 466.1638
-#define B4 493.8833
-
 #define OSCA 0
 #define OSCB 1
 
-#define SINE_WAVE 0
-#define SQUARE_WAVE 1
-#define TRIANGLE_WAVE 2
-#define SAWTOOTH_WAVE 3
-#define OSCILLATOR_OFF 4
-
-float sineTable[WAVE_TABLE_SIZE];
-float squareTable[WAVE_TABLE_SIZE];
-float triangleTable[WAVE_TABLE_SIZE];
-float sawtoothTable[WAVE_TABLE_SIZE];
+#define SQUARE_WAVE 2
+#define TRIANGLE_WAVE 3
+#define SAWTOOTH_WAVE 4
+#define OSCILLATOR_OFF 5
 
 #define BLINK_INTERVAL_MS 500
 
@@ -58,7 +39,6 @@ int YELLOW; // saw
 int WHITE;
 int OSC = 1; // 0 for A, 1 for B
 int CURRENT_WAVEFORM = 0;
-float *currentTablePointer = sineTable; // Pointer to the current waveform table
 
 void set_color(uint16_t red, uint16_t green, uint16_t blue) {
     timer_config_channel_pwm(TIMER, RED_PIN, red);
@@ -70,11 +50,6 @@ void LEDOutput(int oscillator, int waveform) {
     int color;
 
     switch (waveform) {
-        case SINE_WAVE:
-            RED = 0;
-            GREEN = 1023;
-            BLUE = 1023;
-            break;
         case SQUARE_WAVE:
             color = BLUE;
             RED = 1023;
@@ -151,58 +126,58 @@ static void delay_us(int us) {
 }
 
 void TIM6_initialize(void) {
-    // 1. Enable clock
+    // Enable clock
     RCC->APB1ENR1 |= RCC_APB1ENR1_TIM6EN;
     __DSB();  // Ensure clock is enabled
     
-    // 2. Reset timer
+    // Reset timer
     TIM6->CR1 = 0;
     TIM6->ARR = 39;
     
-    // 3. Clear any pending interrupts
+    // Clear any pending interrupts
     TIM6->SR = 0;
     
-    // 4. Enable interrupt
+    // Enable interrupt
     TIM6->DIER |= TIM_DIER_UIE;
     
-    // 5. Configure NVIC
+    // Configure NVIC
     NVIC_SetPriority(TIM6_DAC_IRQn, 1);
     NVIC_EnableIRQ(TIM6_DAC_IRQn);
     
-    // 6. Start timer
+    // Start timer
     TIM6->CR1 |= TIM_CR1_CEN;
 }
 
 
 void TIM7_initialize(void) {
-    // 1. Enable clock
+    // Enable clock
     RCC->APB1ENR1 |= RCC_APB1ENR1_TIM7EN;
     __DSB();  // Ensure clock is enabled
     
-    // 2. Reset timer
+    // Reset timer
     TIM7->CR1 = 0;
     TIM7->PSC = 3999;  // Assuming 4MHz clock: 4000 ticks = 1ms
     TIM7->ARR = BLINK_INTERVAL_MS;
     
-    // 3. Clear any pending interrupts
+    // Clear any pending interrupts
     TIM7->SR = 0;
     
-    // 4. Enable interrupt
+    // Enable interrupt
     TIM7->DIER |= TIM_DIER_UIE;
     
-    // 5. Configure NVIC
+    // Configure NVIC
     NVIC_SetPriority(TIM7_IRQn, 1);
     NVIC_EnableIRQ(TIM7_IRQn);
     
-    // 6. Start timer
+    // Start timer
     TIM7->CR1 |= TIM_CR1_CEN;
 }
 
 void TIM7_IRQHandler(void) {
     if (TIM7->SR & TIM_SR_UIF) {
         TIM7->SR &= ~TIM_SR_UIF;  // Clear interrupt flag
-        printf("TIM7 interrupt!\r\n");
-        printf("OSC value: %d\r\n", OSC);
+        // printf("TIM7 interrupt!\r\n");
+        // printf("OSC value: %d\r\n", OSC);
         
         if (OSC == OSCB) {  // Only blink if OSCB is active
             ledState = !ledState;
@@ -227,39 +202,15 @@ void EXTI0_IRQHandler(void) {
 
 }
 
-void EXTI1_IRQHandler(void) {    
-    printf("EXTI1 interrupt!\r\n");
-
-    if(EXTI->PR1 & EXTI_PR1_PIF1) {
-        
-        CURRENT_WAVEFORM++;
-        if (CURRENT_WAVEFORM > OSCILLATOR_OFF) {
-            CURRENT_WAVEFORM = SINE_WAVE; // Reset to SINE_WAVE
-        }
-        LEDOutput(OSC, CURRENT_WAVEFORM); // Set LED color
-        printf("Current waveform: %d\r\n", CURRENT_WAVEFORM);
-        if (CURRENT_WAVEFORM == SINE_WAVE) {
-            currentTablePointer = sineTable;
-        } else if (CURRENT_WAVEFORM == SQUARE_WAVE) {
-            currentTablePointer = squareTable;
-        } else if (CURRENT_WAVEFORM == TRIANGLE_WAVE) {
-            currentTablePointer = triangleTable;
-        } else if (CURRENT_WAVEFORM == SAWTOOTH_WAVE) {
-            currentTablePointer = sawtoothTable;
-        } else {
-            currentTablePointer = NULL; // No waveform
-        }
-
-        EXTI->PR1 |= EXTI_PR1_PIF1; // Clear interrupt flag
-
-    }
+void EXTI1_IRQHandler(void) {   // for switching waveforms and oscillators 
+    
 }
 
 void TIM6_IRQHandler(void) {
-    DAC_setValue(currentTablePointer[tick]); // Set DAC value from the current waveform table
-    tick++;
-    tick %= WAVE_TABLE_SIZE; 
-    TIM6->SR &= ~TIM_SR_UIF; // Clear the interrupt flag
+    // DAC_setValue(currentTablePointer[tick]); // Set DAC value from the current waveform table
+    // tick++;
+    // tick %= WAVE_TABLE_SIZE; 
+    // TIM6->SR &= ~TIM_SR_UIF; // Clear the interrupt flag
 }
 
 void config_gpio_interrupt(void)
@@ -286,6 +237,13 @@ void config_gpio_interrupt(void)
     NVIC_EnableIRQ(EXTI1_IRQn); // Enable the interrupt
 }
 
+void playNote(int note_delay) {
+    DAC_setValue(0);
+    delay_us(note_delay);
+    DAC_setValue(4095);
+    delay_us(note_delay);
+}
+
 int main(void) {
     // initializing UART
     host_serial_init();
@@ -302,73 +260,57 @@ int main(void) {
     gpio_config_alternate_function(BLUE_PIN, 1);
 
     // Configure the pins for the oscillator button
-    gpio_config_direction(D3, 0b00); // switch
+    gpio_config_mode(D3, 0b00); // switch
     gpio_config_pullup(D3, 0b01); // switch
 
     // Configure the pins for the waveform button
-    gpio_config_direction(D6, INPUT); // Button
+    gpio_config_mode(D6, INPUT); // Button
     gpio_config_pullup(D6, PULL_UP);
 
     config_gpio_interrupt();
-    
-    // wait for serial port readiness
-    // for (volatile int i = 0; i < 1000000; i++) { }
-    printf("Hello, Audio World!\r\n");
-      
+
+    gpio_config_mode(D9, 0b00);
+    gpio_config_mode(D10, 0b00);
+    gpio_config_mode(D11, 0b00);
+
+    gpio_config_pullup(D9, 0b10); // pulldown
+    gpio_config_pullup(D10, 0b10);
+    gpio_config_pullup(D11, 0b10);
+          
     // initializing DAC using dacOutput
     DAC_init();
-    int index = 0;
-
-    buildWaveTable(sineTable);
-    buildSquareWaveTable(squareTable);
-    buildTriangleWaveTable(triangleTable);
-    buildSawtoothWaveTable(sawtoothTable);
     
-    float frequency = A4; // Set desired frequency
-    float delay_us_value = (1.0 / frequency) / WAVE_TABLE_SIZE * 1e6; // Delay in microseconds
-    int delay10us_value = (int)(delay_us_value / 10.0 + 0.5); // Convert to multiples of 10 us (round to nearest)
-
-    printf("Frequency: %f Hz, Delay (us): %f, Delay10us: %d\r\n", frequency, delay_us_value, delay10us_value);
     LEDOutput(OSC, CURRENT_WAVEFORM); // Set LED color
-
-
-    // Initialize TIM6
-    // TIM6_initialize();
     
     // initializing SysTick
     SysTick_initialize();
 
     while (1) {
-        // if (CURRENT_WAVEFORM == SINE_WAVE) {
-        //     DAC_setValue(sineTable[index]);
-        // }
-        // else if (CURRENT_WAVEFORM == SQUARE_WAVE) {
-        //     DAC_setValue(squareTable[index]);
-        // }
-        // else if (CURRENT_WAVEFORM == TRIANGLE_WAVE) {
-        //     DAC_setValue(triangleTable[index]);
-        // }
-        // else if (CURRENT_WAVEFORM == SAWTOOTH_WAVE) {
-        //     DAC_setValue(sawtoothTable[index]);
-        // }
-        // else { // oscillator off
-        //     DAC_setValue(0);
-        // }
-        
-        // index++;
-        // if (index >= WAVE_TABLE_SIZE) {
-        //     index = 0;  // Reset index to loop through the wave table
-        // }
+
+        for (int i = 0; i < 128/2; i += 1) {
+            int dacValue = (i*4095) / (128/2); // Scale to 12-bit value
+            DAC_setValue(dacValue); // Set DAC value
+            delay_us(1);
+        }
+
+        for (int i = 128/2; i >=0; i -= 1) {
+            int dacValue = (i*4095) / (128/2); // Scale to 12-bit value
+            DAC_setValue(dacValue); // Set DAC value
+            delay_us(1);
+        }
 
         // DAC_setValue(0);
-        // delay10us(2);  // Use the calculated delay
-        // DAC_setValue(1023);
-        // delay10us(2);  // Use the calculated delay
-            
-        // delay10us((int)delay_us_value / 10);  // Use the calculated delay
-        DAC_setValue(0);
-        delay_us(100);
-        DAC_setValue(4095);
-        delay_us(100);
+        // delay_us(188/3);
+        // DAC_setValue(2048/2);
+        // delay_us(188/3);
+        // DAC_setValue(2048);
+        // delay_us(188/3);
+        // DAC_setValue(4095);
+        // delay_us(188/3);
+        // DAC_setValue(2048);
+        // delay_us(188/3);
+        // DAC_setValue(2048/2);
+        // delay_us(188/3);
+        // playNote(C4_DELAY);
     }
 }
