@@ -357,6 +357,9 @@ int main(void) {
                 OSC = !OSC;  // Toggle OSC
                 if (OSC == OSCA) {
                     set_color(RED, GREEN, BLUE);
+                } else if (OSC == OSCB) {
+                    ledState = 0;
+                    set_color(1023, 1023, 1023); 
                 }
             }
             osc_flag = 0;
