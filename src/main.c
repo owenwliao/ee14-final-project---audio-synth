@@ -10,35 +10,39 @@
 #define OSCA 0
 #define OSCB 1
 
-#define SQUARE_WAVE 2
-#define TRIANGLE_WAVE 3
-#define SAWTOOTH_WAVE 4
-#define OSCILLATOR_OFF 5
+#define SQUARE_WAVE 0
+#define TRIANGLE_WAVE 1
+#define SAWTOOTH_WAVE 2
+#define OSCILLATOR_OFF 3
 
 #define BLINK_INTERVAL_MS 500
 
-// red = sine
-// blue = square
-// yellow = triangle
-// green = saw
-// white = off
-// solid = OSCA
-// blinking = OSCB
-
-// can change
 #define RED_PIN   A2
 #define GREEN_PIN A0
 #define BLUE_PIN  A1
 #define TIMER     TIM2
 
-// global for set_color()
-int RED; // sine
-int GREEN; // square
-int BLUE; // triangle
-int YELLOW; // saw
-int WHITE;
+#define C       D1
+#define Db      D0
+#define D       D2
+#define Eb      D4
+#define E       D9
+#define F       D10
+#define Gb      D11
+#define G       D12
+#define Ab      A7
+#define A       A6
+#define Bb      A5
+#define B       D13
+
+int RED;
+int GREEN;
+int BLUE;
 int OSC = 1; // 0 for A, 1 for B
 int CURRENT_WAVEFORM = 0;
+
+volatile int waveform_flag = 0;
+volatile int osc_flag = 0;
 
 void set_color(uint16_t red, uint16_t green, uint16_t blue) {
     timer_config_channel_pwm(TIMER, RED_PIN, red);
@@ -47,35 +51,34 @@ void set_color(uint16_t red, uint16_t green, uint16_t blue) {
 }
 
 void LEDOutput(int oscillator, int waveform) {
-    int color;
 
     switch (waveform) {
         case SQUARE_WAVE:
-            color = BLUE;
-            RED = 1023;
+            // RED
+            RED = 0;
             GREEN = 1023;
-            BLUE = 0;
+            BLUE = 1023;
             break;
         case TRIANGLE_WAVE:
-            color = GREEN;
+            // GREEN
             RED = 1023;
             GREEN = 0;
             BLUE = 1023;
             break;
         case SAWTOOTH_WAVE:
-            color = YELLOW;
-            RED = 0;
-            GREEN = 0;
-            BLUE = 1023;
+            // BLUE
+            RED = 1023;
+            GREEN = 1023;
+            BLUE = 0;
             break;
         case OSCILLATOR_OFF:
-            color = WHITE;
+            // WHITE
             RED = 0;
             GREEN = 0;
             BLUE = 0;
             break;
         default:
-            color = WHITE; // default to white
+            // WHITE
             RED = 0;
             GREEN = 0;
             BLUE = 0;
@@ -90,9 +93,7 @@ volatile unsigned int tick = 0;
 volatile int ledState = 0;
 
 void SysTick_Handler(void) {
-    // DAC_setValue(currentTablePointer[tick]); 
     tick++;
-    // tick %= WAVE_TABLE_SIZE; // Wrap around the tick value
 }
 
 // retargeting USART2 -> printf
@@ -191,19 +192,17 @@ void TIM7_IRQHandler(void) {
 }
 
 void EXTI0_IRQHandler(void) {
-    printf("EXTI0 interrupt!\r\n");
     if (EXTI->PR1 & 1) {
-        OSC = !OSC;  // Toggle OSC
-        if (OSC == OSCA) {
-            set_color(RED, GREEN, BLUE);
-        }
+        osc_flag = 1; // Set the flag to indicate a switch press
         EXTI->PR1 |= 1;  // Clear interrupt flag
     }
-
 }
 
-void EXTI1_IRQHandler(void) {   // for switching waveforms and oscillators 
-    
+void EXTI1_IRQHandler(void) {   // for switching waveforms and oscillators
+    if (EXTI->PR1 & EXTI_PR1_PIF1) {
+        waveform_flag = 1; // Set the flag to indicate a waveform change
+        EXTI->PR1 |= EXTI_PR1_PIF1;  // Clear interrupt flag
+    }
 }
 
 void TIM6_IRQHandler(void) {
@@ -237,11 +236,45 @@ void config_gpio_interrupt(void)
     NVIC_EnableIRQ(EXTI1_IRQn); // Enable the interrupt
 }
 
-void playNote(int note_delay) {
+void PlaySquareNote(int note_delay){
     DAC_setValue(0);
     delay_us(note_delay);
     DAC_setValue(4095);
     delay_us(note_delay);
+}
+
+void PlayTriangleNote(int note_delay){
+    for (int i = 0; i < note_delay/2; i += 1) {
+        int dacValue = (i*4095) / (note_delay/2); // Scale to 12-bit value
+        DAC_setValue(dacValue); // Set DAC value
+        delay_us(1);
+    }
+
+    for (int i = note_delay/2; i >=0; i -= 1) {
+        int dacValue = (i*4095) / (note_delay/2); // Scale to 12-bit value
+        DAC_setValue(dacValue); // Set DAC value
+        delay_us(1);
+    }
+}
+
+void PlaySawNote(int note_delay){
+    for (int i = 0; i < note_delay; i += 1) {
+        int dacValue = (i*4095) / (note_delay); // Scale to 12-bit value
+        DAC_setValue(dacValue); // Set DAC value
+        delay_us(1);
+    }
+}
+
+void PlayNote(int note_delay) {
+    if (CURRENT_WAVEFORM == SQUARE_WAVE){
+        PlaySquareNote(note_delay);
+    }
+    if (CURRENT_WAVEFORM == TRIANGLE_WAVE){
+        PlayTriangleNote(note_delay);
+    }
+    if (CURRENT_WAVEFORM == SAWTOOTH_WAVE){
+        PlaySawNote(note_delay);
+    }
 }
 
 int main(void) {
@@ -260,8 +293,8 @@ int main(void) {
     gpio_config_alternate_function(BLUE_PIN, 1);
 
     // Configure the pins for the oscillator button
-    gpio_config_mode(D3, 0b00); // switch
-    gpio_config_pullup(D3, 0b01); // switch
+    gpio_config_mode(D3, INPUT);
+    gpio_config_pullup(D3, PULL_UP);
 
     // Configure the pins for the waveform button
     gpio_config_mode(D6, INPUT); // Button
@@ -269,13 +302,31 @@ int main(void) {
 
     config_gpio_interrupt();
 
-    gpio_config_mode(D9, 0b00);
-    gpio_config_mode(D10, 0b00);
-    gpio_config_mode(D11, 0b00);
+    gpio_config_mode(C, INPUT);
+    gpio_config_mode(Db, INPUT);
+    gpio_config_mode(D, INPUT);
+    gpio_config_mode(Eb, INPUT);
+    gpio_config_mode(E, INPUT);
+    gpio_config_mode(F, INPUT);
+    gpio_config_mode(Gb, INPUT);
+    gpio_config_mode(G, INPUT);
+    gpio_config_mode(Ab, INPUT);
+    gpio_config_mode(A, INPUT);
+    gpio_config_mode(Bb, INPUT);
+    gpio_config_mode(B, INPUT);
 
-    gpio_config_pullup(D9, 0b10); // pulldown
-    gpio_config_pullup(D10, 0b10);
-    gpio_config_pullup(D11, 0b10);
+    gpio_config_pullup(C, PULL_DOWN);
+    gpio_config_pullup(Db, PULL_DOWN);
+    gpio_config_pullup(D, PULL_DOWN);
+    gpio_config_pullup(Eb, PULL_DOWN);
+    gpio_config_pullup(E, PULL_DOWN);
+    gpio_config_pullup(F, PULL_DOWN);
+    gpio_config_pullup(Gb, PULL_DOWN);
+    gpio_config_pullup(G, PULL_DOWN);
+    gpio_config_pullup(Ab, PULL_DOWN);
+    gpio_config_pullup(A, PULL_DOWN);
+    gpio_config_pullup(Bb, PULL_DOWN);
+    gpio_config_pullup(B, PULL_DOWN);
           
     // initializing DAC using dacOutput
     DAC_init();
@@ -286,31 +337,65 @@ int main(void) {
     SysTick_initialize();
 
     while (1) {
-
-        for (int i = 0; i < 128/2; i += 1) {
-            int dacValue = (i*4095) / (128/2); // Scale to 12-bit value
-            DAC_setValue(dacValue); // Set DAC value
-            delay_us(1);
+        if (waveform_flag) {
+            delay_us(500); // Debounce delay
+            
+            if (!gpio_read(D6)) {
+                CURRENT_WAVEFORM++;
+                if (CURRENT_WAVEFORM > OSCILLATOR_OFF){
+                    CURRENT_WAVEFORM = SQUARE_WAVE;
+                }
+                LEDOutput(OSC, CURRENT_WAVEFORM);
+            }
+            waveform_flag = 0;
         }
 
-        for (int i = 128/2; i >=0; i -= 1) {
-            int dacValue = (i*4095) / (128/2); // Scale to 12-bit value
-            DAC_setValue(dacValue); // Set DAC value
-            delay_us(1);
+        if (osc_flag) {
+            delay_us(500);
+            
+            if (!gpio_read(D3)) {
+                OSC = !OSC;  // Toggle OSC
+                if (OSC == OSCA) {
+                    set_color(RED, GREEN, BLUE);
+                }
+            }
+            osc_flag = 0;
         }
-
-        // DAC_setValue(0);
-        // delay_us(188/3);
-        // DAC_setValue(2048/2);
-        // delay_us(188/3);
-        // DAC_setValue(2048);
-        // delay_us(188/3);
-        // DAC_setValue(4095);
-        // delay_us(188/3);
-        // DAC_setValue(2048);
-        // delay_us(188/3);
-        // DAC_setValue(2048/2);
-        // delay_us(188/3);
-        // playNote(C4_DELAY);
+        if (gpio_read(C)) {
+            PlaySquareNote(C4_SQUARE_DELAY);
+        }
+        if (gpio_read(Db)) {
+            PlaySquareNote(Db4_SQUARE_DELAY);
+        }
+        if (gpio_read(D)) {
+            PlaySquareNote(D4_SQUARE_DELAY);
+        }
+        if (gpio_read(Eb)) {
+            PlaySquareNote(Eb4_SQUARE_DELAY);
+        }
+        if (gpio_read(E)) {
+            PlaySquareNote(E4_SQUARE_DELAY);
+        }
+        if (gpio_read(F)) {
+            PlaySquareNote(F4_SQUARE_DELAY);
+        }
+        if (gpio_read(Gb)) {
+            PlaySquareNote(Gb4_SQUARE_DELAY);
+        }
+        if (gpio_read(G)) {
+            PlaySquareNote(G4_SQUARE_DELAY);
+        }
+        if (gpio_read(Ab)) {
+            PlaySquareNote(Ab4_SQUARE_DELAY);
+        }
+        if (gpio_read(A)) {
+            PlaySquareNote(A4_SQUARE_DELAY);
+        }
+        if (gpio_read(Bb)) {
+            PlaySquareNote(Bb4_SQUARE_DELAY);
+        }
+        if (gpio_read(B)) {
+            PlaySquareNote(B4_SQUARE_DELAY);
+        }
     }
 }

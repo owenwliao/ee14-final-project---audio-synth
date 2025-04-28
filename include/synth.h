@@ -1,1 +1,0 @@
-// complementary file for synth.c
