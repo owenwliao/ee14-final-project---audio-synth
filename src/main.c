@@ -54,11 +54,12 @@ int B4_DELAY_ARRAY[3] = {B4_SQUARE_DELAY, B4_TRIANGLE_DELAY, B4_SAW_DELAY};
 int RED;
 int GREEN;
 int BLUE;
-int OSC = 1; // 0 for A, 1 for B
+int OSC = 0; // 0 for A, 1 for B
 int CURRENT_WAVEFORM = 0;
 
 volatile int waveform_flag = 0;
 volatile int osc_flag = 0;
+volatile int buttonPressStartTick = 0;
 
 void set_color(uint16_t red, uint16_t green, uint16_t blue) {
     timer_config_channel_pwm(TIMER, RED_PIN, red);
@@ -165,7 +166,6 @@ void TIM6_initialize(void) {
     TIM6->CR1 |= TIM_CR1_CEN;
 }
 
-
 void TIM7_initialize(void) {
     // Enable clock
     RCC->APB1ENR1 |= RCC_APB1ENR1_TIM7EN;
@@ -210,6 +210,7 @@ void TIM7_IRQHandler(void) {
 void EXTI0_IRQHandler(void) {
     if (EXTI->PR1 & 1) {
         osc_flag = 1; // Set the flag to indicate a switch press
+        buttonPressStartTick = tick; // Record the tick count when the button was pressed
         EXTI->PR1 |= 1;  // Clear interrupt flag
     }
 }
@@ -296,6 +297,7 @@ void PlayNote(int note_array[]) {
 void initialize() {
     // Initialize UART
     host_serial_init();
+    for (volatile int i = 0; i < 1000000; i++) {}
 
     // Initialize TIM7
     TIM7_initialize();
@@ -354,7 +356,66 @@ void initialize() {
 }
 
 int main(void) {
-    initialize();
+    // Initialize UART
+    host_serial_init();
+    for (volatile int i = 0; i < 1000000; i++) {}
+
+    // Initialize TIM7
+    TIM7_initialize();
+
+    // Configure the timer for PWM
+    timer_config_pwm(TIMER, 1000);
+
+    // Configure the pins for PWM output
+    gpio_config_alternate_function(RED_PIN, 1);
+    gpio_config_alternate_function(GREEN_PIN, 1);
+    gpio_config_alternate_function(BLUE_PIN, 1);
+
+    // Configure the pins for the oscillator button
+    gpio_config_mode(D3, INPUT);
+    gpio_config_pullup(D3, PULL_UP);
+
+    // Configure the pins for the waveform button
+    gpio_config_mode(D6, INPUT); // Button
+    gpio_config_pullup(D6, PULL_UP);
+
+    config_gpio_interrupt();
+
+    gpio_config_mode(C, INPUT);
+    gpio_config_mode(Db, INPUT);
+    gpio_config_mode(D, INPUT);
+    gpio_config_mode(Eb, INPUT);
+    gpio_config_mode(E, INPUT);
+    gpio_config_mode(F, INPUT);
+    gpio_config_mode(Gb, INPUT);
+    gpio_config_mode(G, INPUT);
+    gpio_config_mode(Ab, INPUT);
+    gpio_config_mode(A, INPUT);
+    gpio_config_mode(Bb, INPUT);
+    gpio_config_mode(B, INPUT);
+
+    gpio_config_pullup(C, PULL_DOWN);
+    gpio_config_pullup(Db, PULL_DOWN);
+    gpio_config_pullup(D, PULL_DOWN);
+    gpio_config_pullup(Eb, PULL_DOWN);
+    gpio_config_pullup(E, PULL_DOWN);
+    gpio_config_pullup(F, PULL_DOWN);
+    gpio_config_pullup(Gb, PULL_DOWN);
+    gpio_config_pullup(G, PULL_DOWN);
+    gpio_config_pullup(Ab, PULL_DOWN);
+    gpio_config_pullup(A, PULL_DOWN);
+    gpio_config_pullup(Bb, PULL_DOWN);
+    gpio_config_pullup(B, PULL_DOWN);
+          
+    // initializing DAC using dacOutput
+    DAC_init();
+    
+    LEDOutput(OSC, CURRENT_WAVEFORM); // Set LED color
+    
+    // initializing SysTick
+    SysTick_initialize();
+    
+    // printf("System initialized.\r\n");
     while (1) {
         if (waveform_flag) {
             delay_us(500); // Debounce delay
@@ -373,28 +434,37 @@ int main(void) {
             delay_us(500);
             
             if (!gpio_read(D3)) {
-                if (OSC == OSCA) {
-                    PREV_OSCA = CURRENT_WAVEFORM;
-                } else if (OSC == OSCB) {
-                    PREV_OSCB = CURRENT_WAVEFORM;
+                delay_us(30000);
+                if(!gpio_read(D3)){
+                    if (OSC == OSCA) {
+                        PREV_OSCA = CURRENT_WAVEFORM;
+                    } else if (OSC == OSCB) {
+                        PREV_OSCB = CURRENT_WAVEFORM;
+                    }
+        
+                    OSC = !OSC;  // Toggle OSC
+                    
+                    if (OSC == OSCA) {
+                        CURRENT_WAVEFORM = PREV_OSCA;
+                        LEDOutput(OSC, CURRENT_WAVEFORM);
+                    } else if (OSC == OSCB) {
+                        CURRENT_WAVEFORM = PREV_OSCB;
+                        ledState = 0;
+                        set_color(1023, 1023, 1023); 
+                        LEDOutput(OSC, CURRENT_WAVEFORM);
+                    }
                 }
-    
-                OSC = !OSC;  // Toggle OSC
-                
-                if (OSC == OSCA) {
-                    CURRENT_WAVEFORM = PREV_OSCA;
-                    LEDOutput(OSC, CURRENT_WAVEFORM);
-                } else if (OSC == OSCB) {
-                    CURRENT_WAVEFORM = PREV_OSCB;
-                    ledState = 0;
-                    set_color(1023, 1023, 1023); 
+                else {
+                    CURRENT_WAVEFORM++;
+                    if (CURRENT_WAVEFORM > OSCILLATOR_OFF){
+                        CURRENT_WAVEFORM = SQUARE_WAVE;
+                    }
                     LEDOutput(OSC, CURRENT_WAVEFORM);
                 }
-
             }
             osc_flag = 0;
         }
-
+        
         if (gpio_read(C)) {
             PlayNote(C4_DELAY_ARRAY);
         }
