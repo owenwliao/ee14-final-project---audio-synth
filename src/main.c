@@ -35,6 +35,22 @@
 #define Bb      A5
 #define B       D13
 
+volatile int PREV_OSCA = SQUARE_WAVE;
+volatile int PREV_OSCB = SQUARE_WAVE;
+
+int C4_DELAY_ARRAY[3] = {C4_SQUARE_DELAY, C4_TRIANGLE_DELAY, C4_SAW_DELAY};
+int Db4_DELAY_ARRAY[3] = {Db4_SQUARE_DELAY, Db4_TRIANGLE_DELAY, Db4_SAW_DELAY};
+int D4_DELAY_ARRAY[3] = {D4_SQUARE_DELAY, D4_TRIANGLE_DELAY, D4_SAW_DELAY};
+int Eb4_DELAY_ARRAY[3] = {Eb4_SQUARE_DELAY, Eb4_TRIANGLE_DELAY, Eb4_SAW_DELAY};
+int E4_DELAY_ARRAY[3] = {E4_SQUARE_DELAY, E4_TRIANGLE_DELAY, E4_SAW_DELAY};
+int F4_DELAY_ARRAY[3] = {F4_SQUARE_DELAY, F4_TRIANGLE_DELAY, F4_SAW_DELAY};
+int Gb4_DELAY_ARRAY[3] = {Gb4_SQUARE_DELAY, Gb4_TRIANGLE_DELAY, Gb4_SAW_DELAY};
+int G4_DELAY_ARRAY[3] = {G4_SQUARE_DELAY, G4_TRIANGLE_DELAY, G4_SAW_DELAY};
+int Ab4_DELAY_ARRAY[3] = {Ab4_SQUARE_DELAY, Ab4_TRIANGLE_DELAY, Ab4_SAW_DELAY};
+int A4_DELAY_ARRAY[3] = {A4_SQUARE_DELAY, A4_TRIANGLE_DELAY, A4_SAW_DELAY};
+int Bb4_DELAY_ARRAY[3] = {Bb4_SQUARE_DELAY, Bb4_TRIANGLE_DELAY, Bb4_SAW_DELAY};
+int B4_DELAY_ARRAY[3] = {B4_SQUARE_DELAY, B4_TRIANGLE_DELAY, B4_SAW_DELAY};
+
 int RED;
 int GREEN;
 int BLUE;
@@ -265,20 +281,20 @@ void PlaySawNote(int note_delay){
     }
 }
 
-void PlayNote(int note_delay) {
+void PlayNote(int note_array[]) {
     if (CURRENT_WAVEFORM == SQUARE_WAVE){
-        PlaySquareNote(note_delay);
+        PlaySquareNote(note_array[0]);
     }
     if (CURRENT_WAVEFORM == TRIANGLE_WAVE){
-        PlayTriangleNote(note_delay);
+        PlayTriangleNote(note_array[1]);
     }
     if (CURRENT_WAVEFORM == SAWTOOTH_WAVE){
-        PlaySawNote(note_delay);
+        PlaySawNote(note_array[2]);
     }
 }
 
-int main(void) {
-    // initializing UART
+void initialize() {
+    // Initialize UART
     host_serial_init();
 
     // Initialize TIM7
@@ -335,7 +351,10 @@ int main(void) {
     
     // initializing SysTick
     SysTick_initialize();
+}
 
+int main(void) {
+    initialize();
     while (1) {
         if (waveform_flag) {
             delay_us(500); // Debounce delay
@@ -354,51 +373,66 @@ int main(void) {
             delay_us(500);
             
             if (!gpio_read(D3)) {
-                OSC = !OSC;  // Toggle OSC
                 if (OSC == OSCA) {
-                    set_color(RED, GREEN, BLUE);
+                    PREV_OSCA = CURRENT_WAVEFORM;
                 } else if (OSC == OSCB) {
+                    PREV_OSCB = CURRENT_WAVEFORM;
+                }
+    
+                OSC = !OSC;  // Toggle OSC
+                
+                if (OSC == OSCA) {
+                    CURRENT_WAVEFORM = PREV_OSCA;
+                    LEDOutput(OSC, CURRENT_WAVEFORM);
+                } else if (OSC == OSCB) {
+                    CURRENT_WAVEFORM = PREV_OSCB;
                     ledState = 0;
                     set_color(1023, 1023, 1023); 
+                    LEDOutput(OSC, CURRENT_WAVEFORM);
                 }
+
             }
             osc_flag = 0;
         }
+
         if (gpio_read(C)) {
-            PlaySquareNote(C4_SQUARE_DELAY);
+            PlayNote(C4_DELAY_ARRAY);
         }
-        if (gpio_read(Db)) {
-            PlaySquareNote(Db4_SQUARE_DELAY);
+        else if (gpio_read(Db)) {
+            PlayNote(Db4_DELAY_ARRAY);
         }
-        if (gpio_read(D)) {
-            PlaySquareNote(D4_SQUARE_DELAY);
+        else if (gpio_read(D)) {
+            PlayNote(D4_DELAY_ARRAY);
         }
-        if (gpio_read(Eb)) {
-            PlaySquareNote(Eb4_SQUARE_DELAY);
+        else if (gpio_read(Eb)) {
+            PlayNote(Eb4_DELAY_ARRAY);
         }
-        if (gpio_read(E)) {
-            PlaySquareNote(E4_SQUARE_DELAY);
+        else if (gpio_read(E)) {
+            PlayNote(E4_DELAY_ARRAY);
         }
-        if (gpio_read(F)) {
-            PlaySquareNote(F4_SQUARE_DELAY);
+        else if (gpio_read(F)) {
+            PlayNote(F4_DELAY_ARRAY);
         }
-        if (gpio_read(Gb)) {
-            PlaySquareNote(Gb4_SQUARE_DELAY);
+        else if (gpio_read(Gb)) {
+            PlayNote(Gb4_DELAY_ARRAY);
         }
-        if (gpio_read(G)) {
-            PlaySquareNote(G4_SQUARE_DELAY);
+        else if (gpio_read(G)) {
+            PlayNote(G4_DELAY_ARRAY);
         }
-        if (gpio_read(Ab)) {
-            PlaySquareNote(Ab4_SQUARE_DELAY);
+        else if (gpio_read(Ab)) {
+            PlayNote(Ab4_DELAY_ARRAY);
         }
-        if (gpio_read(A)) {
-            PlaySquareNote(A4_SQUARE_DELAY);
+        else if (gpio_read(A)) {
+            PlayNote(A4_DELAY_ARRAY);
         }
-        if (gpio_read(Bb)) {
-            PlaySquareNote(Bb4_SQUARE_DELAY);
+        else if (gpio_read(Bb)) {
+            PlayNote(Bb4_DELAY_ARRAY);
         }
-        if (gpio_read(B)) {
-            PlaySquareNote(B4_SQUARE_DELAY);
+        else if (gpio_read(B)) {
+            PlayNote(B4_DELAY_ARRAY);
+        }
+        else {
+            DAC_setValue(0);
         }
     }
 }
