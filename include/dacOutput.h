@@ -7,7 +7,9 @@
 // DAC initialization
 void DAC_init(void);
 
-// set the Dac with a 12 bit value
-void DAC_setValue(uint16_t value);
+// set the DAC with a 12 bit value
+void DAC_setValue1(uint16_t value);
+
+void DAC_setValue2(uint16_t value);
 
 #endif

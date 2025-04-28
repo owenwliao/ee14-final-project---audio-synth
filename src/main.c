@@ -32,7 +32,7 @@
 #define G       D12
 #define Ab      A7
 #define A       A6
-#define Bb      A5
+#define Bb      D6
 #define B       D13
 
 volatile int PREV_OSCA = SQUARE_WAVE;
@@ -210,22 +210,14 @@ void TIM7_IRQHandler(void) {
 void EXTI0_IRQHandler(void) {
     if (EXTI->PR1 & 1) {
         osc_flag = 1; // Set the flag to indicate a switch press
-        buttonPressStartTick = tick; // Record the tick count when the button was pressed
         EXTI->PR1 |= 1;  // Clear interrupt flag
-    }
-}
-
-void EXTI1_IRQHandler(void) {   // for switching waveforms and oscillators
-    if (EXTI->PR1 & EXTI_PR1_PIF1) {
-        waveform_flag = 1; // Set the flag to indicate a waveform change
-        EXTI->PR1 |= EXTI_PR1_PIF1;  // Clear interrupt flag
     }
 }
 
 void TIM6_IRQHandler(void) {
     // DAC_setValue(currentTablePointer[tick]); // Set DAC value from the current waveform table
     // tick++;
-    // tick %= WAVE_TABLE_SIZE; 
+    // tick %= WAVE_TABLE_SIZE;
     // TIM6->SR &= ~TIM_SR_UIF; // Clear the interrupt flag
 }
 
@@ -240,36 +232,25 @@ void config_gpio_interrupt(void)
     EXTI->IMR1 |= (1<<0);
     NVIC_SetPriority(EXTI0_IRQn, 2); // (IRQ number, priority)
     NVIC_EnableIRQ(EXTI0_IRQn);
-
-    SYSCFG->EXTICR[0] &= ~SYSCFG_EXTICR1_EXTI1; // Clear the EXTI1 bits
-    SYSCFG->EXTICR[0] |= SYSCFG_EXTICR1_EXTI1_PB; // Set EXTI1 to use port B (PB[1] = 001)
-
-    EXTI->FTSR1 |= EXTI_FTSR1_FT1; // Set EXTI1 to trigger on falling edge
-    EXTI->RTSR1 &= ~EXTI_RTSR1_RT1; // Disable rising edge trigger for EXTI1
-
-    EXTI->IMR1 |= EXTI_IMR1_IM1; // Unmask EXTI1 
-
-    NVIC_SetPriority(EXTI1_IRQn, 0); // Set the priority to 0
-    NVIC_EnableIRQ(EXTI1_IRQn); // Enable the interrupt
 }
 
 void PlaySquareNote(int note_delay){
-    DAC_setValue(0);
+    DAC_setValue1(0);
     delay_us(note_delay);
-    DAC_setValue(4095);
+    DAC_setValue1(4095);
     delay_us(note_delay);
 }
 
 void PlayTriangleNote(int note_delay){
     for (int i = 0; i < note_delay/2; i += 1) {
         int dacValue = (i*4095) / (note_delay/2); // Scale to 12-bit value
-        DAC_setValue(dacValue); // Set DAC value
+        DAC_setValue2(dacValue); // Set DAC value
         delay_us(1);
     }
 
     for (int i = note_delay/2; i >=0; i -= 1) {
         int dacValue = (i*4095) / (note_delay/2); // Scale to 12-bit value
-        DAC_setValue(dacValue); // Set DAC value
+        DAC_setValue2(dacValue); // Set DAC value
         delay_us(1);
     }
 }
@@ -277,7 +258,7 @@ void PlayTriangleNote(int note_delay){
 void PlaySawNote(int note_delay){
     for (int i = 0; i < note_delay; i += 1) {
         int dacValue = (i*4095) / (note_delay); // Scale to 12-bit value
-        DAC_setValue(dacValue); // Set DAC value
+        DAC_setValue1(dacValue); // Set DAC value
         delay_us(1);
     }
 }
@@ -313,10 +294,6 @@ void initialize() {
     // Configure the pins for the oscillator button
     gpio_config_mode(D3, INPUT);
     gpio_config_pullup(D3, PULL_UP);
-
-    // Configure the pins for the waveform button
-    gpio_config_mode(D6, INPUT); // Button
-    gpio_config_pullup(D6, PULL_UP);
 
     config_gpio_interrupt();
 
@@ -502,7 +479,8 @@ int main(void) {
             PlayNote(B4_DELAY_ARRAY);
         }
         else {
-            DAC_setValue(0);
+            DAC_setValue1(0);
+            DAC_setValue2(0);
         }
     }
 }
