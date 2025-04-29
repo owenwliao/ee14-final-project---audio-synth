@@ -25,7 +25,7 @@
 #define C       D1
 #define Db      D0
 #define D       D2
-#define Eb      D4
+#define Eb      D5
 #define E       D9
 #define F       D10
 #define Gb      D11
@@ -263,15 +263,51 @@ void PlaySawNote(int note_delay){
     }
 }
 
-void PlayNote(int note_array[]) {
-    if (CURRENT_WAVEFORM == SQUARE_WAVE){
-        PlaySquareNote(note_array[0]);
+void PlayNote1(int note_array[]) {
+    if (OSC == OSCA){
+        if (CURRENT_WAVEFORM == SQUARE_WAVE){
+            PlaySquareNote(note_array[0]);
+        }
+        if (CURRENT_WAVEFORM == TRIANGLE_WAVE){
+            PlayTriangleNote(note_array[1]);
+        }
+        if (CURRENT_WAVEFORM == SAWTOOTH_WAVE){
+            PlaySawNote(note_array[2]);
+        }
+    } else {
+        if (PREV_OSCA == SQUARE_WAVE){
+            PlaySquareNote(note_array[0]);
+        }
+        if (PREV_OSCA == TRIANGLE_WAVE){
+            PlayTriangleNote(note_array[1]);
+        }
+        if (PREV_OSCA == SAWTOOTH_WAVE){
+            PlaySawNote(note_array[2]);
+        }
     }
-    if (CURRENT_WAVEFORM == TRIANGLE_WAVE){
-        PlayTriangleNote(note_array[1]);
-    }
-    if (CURRENT_WAVEFORM == SAWTOOTH_WAVE){
-        PlaySawNote(note_array[2]);
+}
+
+void PlayNote2(int note_array[]) {
+    if (OSC == OSCB) {
+        if (CURRENT_WAVEFORM == SQUARE_WAVE){
+            PlaySquareNote(note_array[0]);
+        }
+        if (CURRENT_WAVEFORM == TRIANGLE_WAVE){
+            PlayTriangleNote(note_array[1]);
+        }
+        if (CURRENT_WAVEFORM == SAWTOOTH_WAVE){
+            PlaySawNote(note_array[2]);
+        }
+    } else {
+        if (PREV_OSCB == SQUARE_WAVE){
+            PlaySquareNote(note_array[0]);
+        }
+        if (PREV_OSCB == TRIANGLE_WAVE){
+            PlayTriangleNote(note_array[1]);
+        }
+        if (PREV_OSCB == SAWTOOTH_WAVE){
+            PlaySawNote(note_array[2]);
+        }
     }
 }
 
@@ -443,40 +479,52 @@ int main(void) {
         }
         
         if (gpio_read(C)) {
-            PlayNote(C4_DELAY_ARRAY);
+            PlayNote1(C4_DELAY_ARRAY);
+            PlayNote2(C4_DELAY_ARRAY);
         }
         else if (gpio_read(Db)) {
-            PlayNote(Db4_DELAY_ARRAY);
+            PlayNote1(Db4_DELAY_ARRAY);
+            PlayNote2(Db4_DELAY_ARRAY);
         }
         else if (gpio_read(D)) {
-            PlayNote(D4_DELAY_ARRAY);
+            PlayNote1(D4_DELAY_ARRAY);
+            PlayNote2(D4_DELAY_ARRAY);
         }
         else if (gpio_read(Eb)) {
-            PlayNote(Eb4_DELAY_ARRAY);
+            PlayNote1(Eb4_DELAY_ARRAY);
+            PlayNote2(Eb4_DELAY_ARRAY);
         }
         else if (gpio_read(E)) {
-            PlayNote(E4_DELAY_ARRAY);
+            PlayNote1(E4_DELAY_ARRAY);
+            PlayNote2(E4_DELAY_ARRAY);
         }
         else if (gpio_read(F)) {
-            PlayNote(F4_DELAY_ARRAY);
+            PlayNote1(F4_DELAY_ARRAY);
+            PlayNote2(F4_DELAY_ARRAY);
         }
         else if (gpio_read(Gb)) {
-            PlayNote(Gb4_DELAY_ARRAY);
+            PlayNote1(Gb4_DELAY_ARRAY);
+            PlayNote2(Gb4_DELAY_ARRAY);
         }
         else if (gpio_read(G)) {
-            PlayNote(G4_DELAY_ARRAY);
+            PlayNote1(G4_DELAY_ARRAY);
+            PlayNote2(G4_DELAY_ARRAY);
         }
         else if (gpio_read(Ab)) {
-            PlayNote(Ab4_DELAY_ARRAY);
+            PlayNote1(Ab4_DELAY_ARRAY);
+            PlayNote2(Ab4_DELAY_ARRAY);
         }
         else if (gpio_read(A)) {
-            PlayNote(A4_DELAY_ARRAY);
+            PlayNote1(A4_DELAY_ARRAY);
+            PlayNote2(A4_DELAY_ARRAY);
         }
         else if (gpio_read(Bb)) {
-            PlayNote(Bb4_DELAY_ARRAY);
+            PlayNote1(Bb4_DELAY_ARRAY);
+            PlayNote2(Bb4_DELAY_ARRAY);
         }
         else if (gpio_read(B)) {
-            PlayNote(B4_DELAY_ARRAY);
+            PlayNote1(B4_DELAY_ARRAY);
+            PlayNote2(B4_DELAY_ARRAY);
         }
         else {
             DAC_setValue1(0);
