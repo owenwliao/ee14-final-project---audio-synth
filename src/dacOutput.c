@@ -8,7 +8,7 @@ void DAC_init(void) {
 
     volatile uint32_t tmp = RCC->APB1ENR1; // Delay
 
-    // dac channel 1 - set up pin PA4 (A4)
+    // dac channel 1 - set up pin PA4 (A3)
     GPIOA->MODER &= ~(3UL << (4 * 2));           // clear mode bits for pa4
     GPIOA->MODER |= (3UL << (4 * 2));            // set to (11)
     GPIOA->PUPDR &= ~(3U << (4 * 2));       // No pull resistor
@@ -16,7 +16,7 @@ void DAC_init(void) {
     DAC->MCR &= ~DAC_MCR_MODE1;             // Clear mode bits
     DAC->MCR |= (0b010 << DAC_MCR_MODE1_Pos);
     
-    // dac channel 2 - set up pin PA5 (A5)
+    // dac channel 2 - set up pin PA5 (A4)
     GPIOA->MODER &= ~(3UL << (5 * 2)); // clear mode bits for pa5
     GPIOA->MODER |= (3UL << (5 * 2));            // set to (11)
     GPIOA->PUPDR &= ~(3U << (5 * 2));       // No pull resistor
