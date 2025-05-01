@@ -2,6 +2,7 @@
 #ifndef WAVEFORMS_H
 #define WAVEFORMS_H
 
+// square delays
 #define C4_SQUARE_DELAY 188
 #define Db4_SQUARE_DELAY 178
 #define D4_SQUARE_DELAY 168
@@ -15,6 +16,7 @@
 #define Bb4_SQUARE_DELAY 105
 #define B4_SQUARE_DELAY 100
 
+// triangle delays
 #define C4_TRIANGLE_DELAY 124
 #define Db4_TRIANGLE_DELAY 118
 #define D4_TRIANGLE_DELAY 110
@@ -28,6 +30,7 @@
 #define Bb4_TRIANGLE_DELAY 68
 #define B4_TRIANGLE_DELAY 66
 
+// saw delays
 #define C4_SAW_DELAY 125
 #define Db4_SAW_DELAY 118
 #define D4_SAW_DELAY 112

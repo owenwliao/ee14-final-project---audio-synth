@@ -1,1 +1,0 @@
-// for reading the potentiometer value and scales it to a filter cutoff value

@@ -5,8 +5,6 @@
 #include <stdio.h>
 #include <math.h>
 
-#define PI 3.14159265358979323846
-
 #define OSCA 0
 #define OSCB 1
 
@@ -35,9 +33,16 @@
 #define Bb      D6
 #define B       D13
 
+// keeping the oscillators in memory when we switch 
 volatile int PREV_OSCA = SQUARE_WAVE;
 volatile int PREV_OSCB = SQUARE_WAVE;
 
+// flags and ticks
+volatile int waveform_flag = 0;
+volatile int osc_flag = 0;
+volatile int buttonPressStartTick = 0;
+
+// arrays for knowing what waveform to switch to
 int C4_DELAY_ARRAY[3] = {C4_SQUARE_DELAY, C4_TRIANGLE_DELAY, C4_SAW_DELAY};
 int Db4_DELAY_ARRAY[3] = {Db4_SQUARE_DELAY, Db4_TRIANGLE_DELAY, Db4_SAW_DELAY};
 int D4_DELAY_ARRAY[3] = {D4_SQUARE_DELAY, D4_TRIANGLE_DELAY, D4_SAW_DELAY};
@@ -57,16 +62,14 @@ int BLUE;
 int OSC = 0; // 0 for A, 1 for B
 int CURRENT_WAVEFORM = 0;
 
-volatile int waveform_flag = 0;
-volatile int osc_flag = 0;
-volatile int buttonPressStartTick = 0;
-
+// set color of LED based on waveform
 void set_color(uint16_t red, uint16_t green, uint16_t blue) {
     timer_config_channel_pwm(TIMER, RED_PIN, red);
     timer_config_channel_pwm(TIMER, GREEN_PIN, green);
     timer_config_channel_pwm(TIMER, BLUE_PIN, blue);
 }
 
+// logic for switching between different LED states
 void LEDOutput(int oscillator, int waveform) {
 
     switch (waveform) {
@@ -113,95 +116,87 @@ void SysTick_Handler(void) {
     tick++;
 }
 
-// retargeting USART2 -> printf
-int _write(int file, char *ptr, int len) {
-    serial_write(USART2, ptr, len);
-    return len;
-}
-
 void SysTick_initialize(void) {
-    // Disable the counter and reset all the settings
+    // disabling counter and resetting all settings
     SysTick->CTRL = 0;
 
-    // Set how often the interrupt should fire
-    // Clock runs at 4MHz
+    // interrupt fires every 10us
     SysTick->LOAD = 39;  
 
-    // This sets the priority of the interrupt to 15 (2^4 - 1), which is the
-    // largest supported value (aka lowest priority)
+    // sets the priority of the interrupt to 15 (lowest priority)
     NVIC_SetPriority (SysTick_IRQn, (1<<__NVIC_PRIO_BITS) - 1);
-    SysTick->VAL = 0; // Reset the current value
-    SysTick->CTRL |= SysTick_CTRL_CLKSOURCE_Msk; // Use the processor clock
-    SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk; // Enable the interrupt
-    SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk; // Enable the counter
+    SysTick->VAL = 0; // reset current value
+    SysTick->CTRL |= SysTick_CTRL_CLKSOURCE_Msk; // using processor clock
+    SysTick->CTRL |= SysTick_CTRL_TICKINT_Msk; // enable interrupt
+    SysTick->CTRL |= SysTick_CTRL_ENABLE_Msk; // enable counter
 }
 
+// delay function using systick
 static void delay_us(int us) {
     int start = tick;
     while ((tick - start) < us) {
-        // wait
     }
 }
 
+// tim6 initialization
 void TIM6_initialize(void) {
-    // Enable clock
+    // enable clock
     RCC->APB1ENR1 |= RCC_APB1ENR1_TIM6EN;
-    __DSB();  // Ensure clock is enabled
+    __DSB();  // ensure clock is enabled
     
-    // Reset timer
+    // reset timer
     TIM6->CR1 = 0;
     TIM6->ARR = 39;
     
-    // Clear any pending interrupts
+    // clear pending interrupts
     TIM6->SR = 0;
     
-    // Enable interrupt
+    // enable interrupt
     TIM6->DIER |= TIM_DIER_UIE;
     
-    // Configure NVIC
+    // configure NVIC
     NVIC_SetPriority(TIM6_DAC_IRQn, 1);
     NVIC_EnableIRQ(TIM6_DAC_IRQn);
     
-    // Start timer
+    // start timer
     TIM6->CR1 |= TIM_CR1_CEN;
 }
 
 void TIM7_initialize(void) {
-    // Enable clock
+    // enable clock
     RCC->APB1ENR1 |= RCC_APB1ENR1_TIM7EN;
-    __DSB();  // Ensure clock is enabled
+    __DSB();  // ensure clock is enabled
     
-    // Reset timer
+    // reset timer
     TIM7->CR1 = 0;
-    TIM7->PSC = 3999;  // Assuming 4MHz clock: 4000 ticks = 1ms
+    TIM7->PSC = 3999;  // 1ms
     TIM7->ARR = BLINK_INTERVAL_MS;
     
-    // Clear any pending interrupts
+    // clear pending interrupts
     TIM7->SR = 0;
     
-    // Enable interrupt
+    // enable interrupt
     TIM7->DIER |= TIM_DIER_UIE;
     
-    // Configure NVIC
+    // configure NVIC
     NVIC_SetPriority(TIM7_IRQn, 1);
     NVIC_EnableIRQ(TIM7_IRQn);
     
-    // Start timer
+    // start timer
     TIM7->CR1 |= TIM_CR1_CEN;
 }
 
+
 void TIM7_IRQHandler(void) {
     if (TIM7->SR & TIM_SR_UIF) {
-        TIM7->SR &= ~TIM_SR_UIF;  // Clear interrupt flag
-        // printf("TIM7 interrupt!\r\n");
-        // printf("OSC value: %d\r\n", OSC);
+        TIM7->SR &= ~TIM_SR_UIF;  // clear interrupt flag
         
-        if (OSC == OSCB) {  // Only blink if OSCB is active
+        if (OSC == OSCB) {  // only blink if OSCB is active
             ledState = !ledState;
             if (ledState) {
-                set_color(RED, GREEN, BLUE);  // On
+                set_color(RED, GREEN, BLUE);  // on
             } else {
-                set_color(1023, 1023, 1023);  // Off
+                set_color(1023, 1023, 1023);  // off
             }
         }
     }
@@ -209,20 +204,15 @@ void TIM7_IRQHandler(void) {
 
 void EXTI0_IRQHandler(void) {
     if (EXTI->PR1 & 1) {
-        osc_flag = 1; // Set the flag to indicate a switch press
-        EXTI->PR1 |= 1;  // Clear interrupt flag
+        osc_flag = 1; // set flag to indicate a switch press
+        EXTI->PR1 |= 1;  // clear interrupt flag
     }
 }
 
-void TIM6_IRQHandler(void) {
-    // DAC_setValue(currentTablePointer[tick]); // Set DAC value from the current waveform table
-    // tick++;
-    // tick %= WAVE_TABLE_SIZE;
-    // TIM6->SR &= ~TIM_SR_UIF; // Clear the interrupt flag
+void TIM6_IRQHandler(void) { // can i get rid of this?
 }
 
-void config_gpio_interrupt(void)
-{
+void config_gpio_interrupt(void) {
     RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;
     SYSCFG->EXTICR[0] &= ~SYSCFG_EXTICR1_EXTI0_Msk;
     SYSCFG->EXTICR[0] |= 1<<0;
@@ -234,6 +224,7 @@ void config_gpio_interrupt(void)
     NVIC_EnableIRQ(EXTI0_IRQn);
 }
 
+// square wave logic
 void PlaySquareNote(int note_delay){
     DAC_setValue1(0);
     delay_us(note_delay);
@@ -241,28 +232,31 @@ void PlaySquareNote(int note_delay){
     delay_us(note_delay);
 }
 
+// triangle wave logic (on channel 2 to let us fine tune the volume using a resistor)
 void PlayTriangleNote(int note_delay){
     for (int i = 0; i < note_delay/2; i += 1) {
-        int dacValue = (i*4095) / (note_delay/2); // Scale to 12-bit value
-        DAC_setValue2(dacValue); // Set DAC value
+        int dacValue = (i*4095) / (note_delay/2); // scaling to 12-bit value
+        DAC_setValue2(dacValue); 
         delay_us(1);
     }
 
     for (int i = note_delay/2; i >=0; i -= 1) {
-        int dacValue = (i*4095) / (note_delay/2); // Scale to 12-bit value
-        DAC_setValue2(dacValue); // Set DAC value
+        int dacValue = (i*4095) / (note_delay/2); // scaling to 12-bit value
+        DAC_setValue2(dacValue);
         delay_us(1);
     }
 }
 
+// saw logic
 void PlaySawNote(int note_delay){
     for (int i = 0; i < note_delay; i += 1) {
-        int dacValue = (i*4095) / (note_delay); // Scale to 12-bit value
-        DAC_setValue1(dacValue); // Set DAC value
+        int dacValue = (i*4095) / (note_delay); // scaling to 12-bit value
+        DAC_setValue1(dacValue);
         delay_us(1);
     }
 }
 
+// play note on channel 1
 void PlayNote1(int note_array[]) {
     if (OSC == OSCA){
         if (CURRENT_WAVEFORM == SQUARE_WAVE){
@@ -274,7 +268,8 @@ void PlayNote1(int note_array[]) {
         if (CURRENT_WAVEFORM == SAWTOOTH_WAVE){
             PlaySawNote(note_array[2]);
         }
-    } else {
+    } 
+    else {
         if (PREV_OSCA == SQUARE_WAVE){
             PlaySquareNote(note_array[0]);
         }
@@ -287,6 +282,7 @@ void PlayNote1(int note_array[]) {
     }
 }
 
+// play note on channel 2
 void PlayNote2(int note_array[]) {
     if (OSC == OSCB) {
         if (CURRENT_WAVEFORM == SQUARE_WAVE){
@@ -298,7 +294,8 @@ void PlayNote2(int note_array[]) {
         if (CURRENT_WAVEFORM == SAWTOOTH_WAVE){
             PlaySawNote(note_array[2]);
         }
-    } else {
+    } 
+    else {
         if (PREV_OSCB == SQUARE_WAVE){
             PlaySquareNote(note_array[0]);
         }
@@ -311,23 +308,20 @@ void PlayNote2(int note_array[]) {
     }
 }
 
+// initialize everything
 void initialize() {
-    // Initialize UART
-    host_serial_init();
-    for (volatile int i = 0; i < 1000000; i++) {}
-
-    // Initialize TIM7
+    // initialize TIM7
     TIM7_initialize();
 
-    // Configure the timer for PWM
+    // confiure timer for PWM
     timer_config_pwm(TIMER, 1000);
 
-    // Configure the pins for PWM output
+    // configure pins for PWM output
     gpio_config_alternate_function(RED_PIN, 1);
     gpio_config_alternate_function(GREEN_PIN, 1);
     gpio_config_alternate_function(BLUE_PIN, 1);
 
-    // Configure the pins for the oscillator button
+    // configure pins for the oscillator button
     gpio_config_mode(D3, INPUT);
     gpio_config_pullup(D3, PULL_UP);
 
@@ -362,89 +356,32 @@ void initialize() {
     // initializing DAC using dacOutput
     DAC_init();
     
-    LEDOutput(OSC, CURRENT_WAVEFORM); // Set LED color
+    LEDOutput(OSC, CURRENT_WAVEFORM); // set LED color
     
     // initializing SysTick
     SysTick_initialize();
 }
 
 int main(void) {
-    // Initialize UART
-    host_serial_init();
-    for (volatile int i = 0; i < 1000000; i++) {}
+    // initialize everything
+    initialize();
 
-    // Initialize TIM7
-    TIM7_initialize();
-
-    // Configure the timer for PWM
-    timer_config_pwm(TIMER, 1000);
-
-    // Configure the pins for PWM output
-    gpio_config_alternate_function(RED_PIN, 1);
-    gpio_config_alternate_function(GREEN_PIN, 1);
-    gpio_config_alternate_function(BLUE_PIN, 1);
-
-    // Configure the pins for the oscillator button
-    gpio_config_mode(D3, INPUT);
-    gpio_config_pullup(D3, PULL_UP);
-
-    // Configure the pins for the waveform button
-    gpio_config_mode(D6, INPUT); // Button
-    gpio_config_pullup(D6, PULL_UP);
-
-    config_gpio_interrupt();
-
-    gpio_config_mode(C, INPUT);
-    gpio_config_mode(Db, INPUT);
-    gpio_config_mode(D, INPUT);
-    gpio_config_mode(Eb, INPUT);
-    gpio_config_mode(E, INPUT);
-    gpio_config_mode(F, INPUT);
-    gpio_config_mode(Gb, INPUT);
-    gpio_config_mode(G, INPUT);
-    gpio_config_mode(Ab, INPUT);
-    gpio_config_mode(A, INPUT);
-    gpio_config_mode(Bb, INPUT);
-    gpio_config_mode(B, INPUT);
-
-    gpio_config_pullup(C, PULL_DOWN);
-    gpio_config_pullup(Db, PULL_DOWN);
-    gpio_config_pullup(D, PULL_DOWN);
-    gpio_config_pullup(Eb, PULL_DOWN);
-    gpio_config_pullup(E, PULL_DOWN);
-    gpio_config_pullup(F, PULL_DOWN);
-    gpio_config_pullup(Gb, PULL_DOWN);
-    gpio_config_pullup(G, PULL_DOWN);
-    gpio_config_pullup(Ab, PULL_DOWN);
-    gpio_config_pullup(A, PULL_DOWN);
-    gpio_config_pullup(Bb, PULL_DOWN);
-    gpio_config_pullup(B, PULL_DOWN);
-          
-    // initializing DAC using dacOutput
-    DAC_init();
-    
-    LEDOutput(OSC, CURRENT_WAVEFORM); // Set LED color
-    
-    // initializing SysTick
-    SysTick_initialize();
-    
-    // printf("System initialized.\r\n");
     while (1) {
         if (waveform_flag) {
-            delay_us(500); // Debounce delay
+            delay_us(500); // debounce delay
             
-            if (!gpio_read(D6)) {
+            if (!gpio_read(D6)) { // cycle thru waveforms
                 CURRENT_WAVEFORM++;
                 if (CURRENT_WAVEFORM > OSCILLATOR_OFF){
-                    CURRENT_WAVEFORM = SQUARE_WAVE;
+                    CURRENT_WAVEFORM = SQUARE_WAVE; // loop back to square
                 }
                 LEDOutput(OSC, CURRENT_WAVEFORM);
             }
-            waveform_flag = 0;
+            waveform_flag = 0; // reset flag
         }
 
         if (osc_flag) {
-            delay_us(500);
+            delay_us(500); // debounce
             
             if (!gpio_read(D3)) {
                 delay_us(30000);
@@ -455,12 +392,13 @@ int main(void) {
                         PREV_OSCB = CURRENT_WAVEFORM;
                     }
         
-                    OSC = !OSC;  // Toggle OSC
+                    OSC = !OSC;  // toggle OSC
                     
                     if (OSC == OSCA) {
                         CURRENT_WAVEFORM = PREV_OSCA;
                         LEDOutput(OSC, CURRENT_WAVEFORM);
-                    } else if (OSC == OSCB) {
+                    } 
+                    else if (OSC == OSCB) {
                         CURRENT_WAVEFORM = PREV_OSCB;
                         ledState = 0;
                         set_color(1023, 1023, 1023); 
@@ -478,6 +416,7 @@ int main(void) {
             osc_flag = 0;
         }
         
+        // play notes
         if (gpio_read(C)) {
             PlayNote1(C4_DELAY_ARRAY);
             PlayNote2(C4_DELAY_ARRAY);
@@ -527,7 +466,7 @@ int main(void) {
             PlayNote2(B4_DELAY_ARRAY);
         }
         else {
-            DAC_setValue1(0);
+            DAC_setValue1(0); // silence
             DAC_setValue2(0);
         }
     }
