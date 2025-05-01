@@ -7,6 +7,6 @@ May 1, 2025
 Project Poster 💾
 [![📄 View the Poster (PDF)](assets/EE%2014%20-%20Final%20Project.png)](assets/EE%2014%20-%20Final%20Project%20Poster%20-%20Mason%20D%20Owen%20L%20Susan%20N.pdf)
 
-Project Demo Video 🎹
+Project Demo Video 🎹 (Click image below to watch)
 
 [![Watch the Demo](https://img.youtube.com/vi/pEdnrgp-lO0/0.jpg)](https://youtu.be/pEdnrgp-lO0)
